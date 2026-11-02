@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="RepoPilot API")
@@ -17,3 +17,19 @@ def home():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@app.post("/api/projects")
+async def upload_project(file: UploadFile):
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip files are allowed")
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="The file is empty")
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
+
+    return {"filename": file.filename, "size_bytes": len(contents)}
