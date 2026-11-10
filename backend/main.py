@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-
+import io
+import zipfile
+from zip_safety import find_unsafe_names
 app = FastAPI(title="RepoPilot API")
 
 app.add_middleware(
@@ -31,5 +33,13 @@ async def upload_project(file: UploadFile):
         raise HTTPException(status_code=400, detail="The file is empty")
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
+    try:
+        with zipfile.ZipFile(io.BytesIO(contents)) as zf:
+            names = zf.namelist()
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Not a valid ZIP file")
+
+    if find_unsafe_names(names):
+        raise HTTPException(status_code=400, detail="ZIP contains unsafe file paths")
 
     return {"filename": file.filename, "size_bytes": len(contents)}
